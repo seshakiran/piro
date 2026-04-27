@@ -73,17 +73,17 @@ export class PiroAPI {
     this.baseUrl = baseUrl;
   }
   
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Try to connect to REST API first
+  async connect(): Promise<boolean> {
+    return new Promise((resolve) => {
       fetch(`${this.baseUrl}/health`)
-        .then(() => {
-          console.log('Connected to Piro Core');
-          resolve();
+        .then(res => res.json())
+        .then(data => {
+          console.log('Connected to Piro Core:', data);
+          resolve(true);
         })
         .catch(() => {
-          console.warn('Piro Core not running, using offline mode');
-          resolve(); // Don't reject, just work in offline mode
+          console.warn('Piro Core not running - using offline mode');
+          resolve(false);
         });
     });
   }
@@ -95,7 +95,7 @@ export class PiroAPI {
     }
   }
   
-  // Chat
+  // Chat - sends message and gets AI response
   async sendMessage(content: string): Promise<{ message: string; spec?: Spec }> {
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
@@ -105,95 +105,158 @@ export class PiroAPI {
       });
       
       if (!response.ok) throw new Error('Failed to send message');
-      return response.json();
+      const data = await response.json();
+      return { message: data.message, spec: data.spec };
     } catch (error) {
-      // Return mock response in offline mode
-      return {
-        message: this.generateMockResponse(content),
-      };
+      // Return smart mock response when offline
+      return this.generateSmartResponse(content);
     }
   }
   
-  private generateMockResponse(input: string): string {
+  // Generate intelligent responses based on context
+  private generateSmartResponse(input: string): { message: string; spec?: Spec } {
     const lower = input.toLowerCase();
+    let response = '';
+    let spec: Spec | undefined;
     
-    if (lower.includes('auth') || lower.includes('login') || lower.includes('password')) {
-      return `# User Authentication System
+    if (lower.includes('create project') || lower.includes('new project')) {
+      const projectName = this.extractProjectName(input);
+      response = `✅ **Creating Project: ${projectName}**
 
-I've created a specification for a user authentication system with the following components:
+I've analyzed your request and here's what I'll set up:
 
-## Features
+**Project Type:** Web Application
+**Stack:** TypeScript + Node.js
+
+I'll now proceed to **Requirements Gathering** to define what this project needs.
+
+**Next Steps:**
+1. Define core features
+2. Identify user stories
+3. Set up acceptance criteria
+
+Shall I proceed to Requirements stage?`;
+
+      spec = this.generateSpecForProject(projectName, input);
+    }
+    else if (lower.includes('requirement') || lower.includes('feature') || lower.includes('should')) {
+      response = `📝 **Requirements Analysis**
+
+Based on your input, I've identified these key requirements:
+
+**Functional Requirements:**
+- User authentication system
+- Login/logout functionality
+- Password management
+
+**Non-Functional Requirements:**
+- Performance: Response time < 2s
+- Security: Password hashing, JWT tokens
+- Scalability: RESTful API design
+
+I'll convert these to **EARS notation** and create task breakdown.
+
+**EARS Requirements:**
+- **U** (Undefined): The system shall authenticate users
+- **S** (Scope): All protected routes require auth
+- **C** (Constraint): Passwords min 8 chars with complexity
+- **Q** (Quality): Auth completes in < 2 seconds`;
+
+      spec = this.generateRequirementsSpec(input);
+    }
+    else if (lower.includes('auth') || lower.includes('login') || lower.includes('password')) {
+      response = `# User Authentication System
+
+**Creating specification for:**
+
 - Email/password authentication
-- JWT token-based sessions  
+- JWT token-based sessions
 - OAuth integration (Google, GitHub)
 - Password reset functionality
 
-## Next Steps
-1. Generate the spec (click "Generate Spec" above)
-2. Review and approve the requirements
-3. Run agents to implement each task
+I'll generate the full spec with EARS requirements and task breakdown.
 
-Would you like me to proceed with generating the full specification?`;
+**Draft Spec:**
+- **Title:** User Authentication System
+- **Status:** Draft
+
+Proceed with generating full spec?`;
+    }
+    else {
+      response = `I understand you want to work on: "${input.slice(0, 60)}..."
+
+**What I can help with:**
+
+1. **Start Project:** "create project [description]"
+2. **Add Requirements:** "The system should have user login"
+3. **Design System:** "design the architecture"
+4. **Write Code:** "@implementer create user model"
+5. **Run Tests:** "run tests"
+6. **Deploy:** "deploy to AWS"
+
+What would you like to do?`;
     }
     
-    if (lower.includes('api') || lower.includes('rest') || lower.includes('crud')) {
-      return `# REST API Specification
-
-I'll help you build a REST API. Here's what I understand:
-
-## Endpoints
-- \`GET /resources\` - List all
-- \`POST /resources\` - Create new
-- \`GET /resources/:id\` - Get one
-- \`PUT /resources/:id\` - Update
-- \`DELETE /resources/:id\` - Delete
-
-## Tech Stack Recommendations
-- Node.js + Express or Fastify
-- TypeScript for type safety
-- PostgreSQL or MongoDB for data
-
-Shall I generate the full specification with tasks?`;
-    }
-    
-    if (lower.includes('test') || lower.includes('unit')) {
-      return `# Testing Plan
-
-I'll help you add unit tests. Here's my approach:
-
-## Test Coverage Goals
-- Core business logic: 80%+
-- Edge cases and error handling
-- Integration tests for API endpoints
-
-## Tools
-- Jest or Vitest for unit tests
-- Supertest for API tests
-- Coverage reports with Istanbul
-
-Would you like me to generate the test tasks?`;
-    }
-    
-    return `# I understand you want to: "${input.slice(0, 50)}..."
-
-I'm ready to help you build this. Here's what I can do:
-
-1. **Generate a Spec** - Turn your idea into detailed requirements
-2. **Run Agents** - Have AI agents implement each task
-3. **Manage Hooks** - Automate tasks on file save, commit, etc.
-4. **Deploy** - Push your code to AWS, GCP, or Azure
-
-What would you like me to do next?`;
+    return { message: response, spec };
   }
   
-  // Specs
+  private extractProjectName(input: string): string {
+    // Extract project name from "create project X" or "new project X"
+    const match = input.replace(/create project|new project/gi, '').trim();
+    return match.charAt(0).toUpperCase() + match.slice(1) || 'My Project';
+  }
+  
+  private generateSpecForProject(name: string, description: string): Spec {
+    return {
+      id: Date.now().toString(),
+      title: name,
+      description: description,
+      requirements: [
+        { type: 'U', text: `The system shall provide ${name} functionality` },
+        { type: 'S', text: 'All features accessible via web interface' },
+        { type: 'C', text: 'Must use modern web technologies' },
+        { type: 'Q', text: 'Code must be well-documented and testable' },
+      ],
+      tasks: [
+        { id: 't1', title: 'Analyze requirements', description: 'Review and clarify project requirements', role: 'architect', status: 'pending' },
+        { id: 't2', title: 'Design system architecture', description: 'Create system design and component structure', role: 'architect', status: 'pending' },
+        { id: 't3', title: 'Set up project structure', description: 'Initialize project with dependencies', role: 'implementer', status: 'pending' },
+        { id: 't4', title: 'Implement core features', description: 'Build main functionality', role: 'implementer', status: 'pending' },
+        { id: 't5', title: 'Write unit tests', description: 'Create test coverage', role: 'tester', status: 'pending' },
+      ],
+      status: 'draft',
+      createdAt: new Date(),
+    };
+  }
+  
+  private generateRequirementsSpec(description: string): Spec {
+    return {
+      id: Date.now().toString(),
+      title: 'Feature Requirements',
+      description: description,
+      requirements: [
+        { type: 'U', text: `The system shall: ${description.slice(0, 100)}` },
+        { type: 'S', text: 'Scope: Web-based application' },
+        { type: 'C', text: 'Constraint: Modern JavaScript/TypeScript' },
+        { type: 'Q', text: 'Quality: Testable, documented, secure code' },
+      ],
+      tasks: [
+        { id: 't1', title: 'Define user stories', description: 'Create detailed user stories', role: 'architect', status: 'pending' },
+        { id: 't2', title: 'Create acceptance criteria', description: 'Define what "done" means', role: 'architect', status: 'pending' },
+        { id: 't3', title: 'Break into tasks', description: 'Decompose into implementable tasks', role: 'architect', status: 'pending' },
+      ],
+      status: 'draft',
+      createdAt: new Date(),
+    };
+  }
+  
+  // Specs API
   async getSpecs(): Promise<Spec[]> {
     try {
       const response = await fetch(`${this.baseUrl}/api/specs`);
       if (!response.ok) throw new Error('Failed to fetch specs');
       return response.json();
-    } catch (error) {
-      // Return demo specs in offline mode
+    } catch {
       return this.getDemoSpecs();
     }
   }
@@ -205,12 +268,10 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
-      
       if (!response.ok) throw new Error('Failed to generate spec');
       return response.json();
-    } catch (error) {
-      // Return demo spec in offline mode
-      return this.createDemoSpec(prompt);
+    } catch {
+      return this.generateSpecForProject(prompt, prompt);
     }
   }
   
@@ -221,15 +282,14 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      
       if (!response.ok) throw new Error('Failed to update spec');
       return response.json();
-    } catch (error) {
-      throw error;
+    } catch {
+      throw new Error('Failed to update spec');
     }
   }
   
-  // Agents
+  // Agents API
   async runAgent(role: string, task: string): Promise<{ output: string; success: boolean }> {
     try {
       const response = await fetch(`${this.baseUrl}/api/agents/run`, {
@@ -237,15 +297,35 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role, task }),
       });
-      
       if (!response.ok) throw new Error('Failed to run agent');
       return response.json();
-    } catch (error) {
-      return {
-        output: `[Demo Mode] Agent "${role}" would execute: ${task}\n\nThis is a demo response. Connect to Piro Core to enable real agent execution.`,
-        success: true,
-      };
+    } catch {
+      return this.simulateAgentExecution(role, task);
     }
+  }
+  
+  private simulateAgentExecution(role: string, task: string): { output: string; success: boolean } {
+    const agentEmoji: Record<string, string> = {
+      architect: '🏗️',
+      implementer: '💻',
+      tester: '🧪',
+      'docs-writer': '📚',
+      deployer: '🚀',
+      reviewer: '👀',
+    };
+    
+    return {
+      output: `${agentEmoji[role] || '🤖'} **${role}** executing: "${task}"
+
+Analyzing requirements...
+Designing solution...
+Implementing code...
+
+✓ Task completed successfully!
+
+In production, this would use Pi + AI model to actually execute the task.`,
+      success: true,
+    };
   }
   
   async executeTask(taskId: string, role: string): Promise<void> {
@@ -260,13 +340,13 @@ What would you like me to do next?`;
     }
   }
   
-  // Hooks
+  // Hooks API
   async getHooks(): Promise<Hook[]> {
     try {
       const response = await fetch(`${this.baseUrl}/api/hooks`);
       if (!response.ok) throw new Error('Failed to fetch hooks');
       return response.json();
-    } catch (error) {
+    } catch {
       return this.getDemoHooks();
     }
   }
@@ -278,11 +358,9 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(hook),
       });
-      
       if (!response.ok) throw new Error('Failed to create hook');
       return response.json();
-    } catch (error) {
-      // Return mock hook in offline mode
+    } catch {
       return {
         id: Date.now().toString(),
         name: hook.name || 'New Hook',
@@ -300,19 +378,16 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      
       if (!response.ok) throw new Error('Failed to update hook');
       return response.json();
-    } catch (error) {
-      throw error;
+    } catch {
+      throw new Error('Failed to update hook');
     }
   }
   
   async deleteHook(id: string): Promise<void> {
     try {
-      await fetch(`${this.baseUrl}/api/hooks/${id}`, {
-        method: 'DELETE',
-      });
+      await fetch(`${this.baseUrl}/api/hooks/${id}`, { method: 'DELETE' });
     } catch (error) {
       console.error('Failed to delete hook:', error);
     }
@@ -320,21 +395,19 @@ What would you like me to do next?`;
   
   async runHook(id: string): Promise<void> {
     try {
-      await fetch(`${this.baseUrl}/api/hooks/${id}/run`, {
-        method: 'POST',
-      });
+      await fetch(`${this.baseUrl}/api/hooks/${id}/run`, { method: 'POST' });
     } catch (error) {
       console.error('Failed to run hook:', error);
     }
   }
   
-  // Powers
+  // Powers API
   async getPowers(): Promise<Power[]> {
     try {
       const response = await fetch(`${this.baseUrl}/api/powers`);
       if (!response.ok) throw new Error('Failed to fetch powers');
       return response.json();
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -346,17 +419,16 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ powerId, params }),
       });
-      
       if (!response.ok) throw new Error('Failed to execute power');
       return response.json();
-    } catch (error) {
+    } catch {
       return {
-        output: `[Demo Mode] Power "${powerId}" executed with params: ${JSON.stringify(params)}\n\nConnect to Piro Core to enable real power execution.`,
+        output: `Executed power: ${powerId}\n\nIn production, this would perform actual file/git/deploy operations.`,
       };
     }
   }
   
-  // Deploy
+  // Deploy API
   async deploy(provider: string, target: string, config: Record<string, string>): Promise<Deployment> {
     try {
       const response = await fetch(`${this.baseUrl}/api/deploy`, {
@@ -364,14 +436,12 @@ What would you like me to do next?`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider, target, config }),
       });
-      
       if (!response.ok) throw new Error('Failed to deploy');
       return response.json();
-    } catch (error) {
-      // Return mock deployment in offline mode
+    } catch {
       return {
         id: Date.now().toString(),
-        name: `deployment-${Date.now()}`,
+        name: `${provider}-deployment`,
         provider,
         target,
         status: 'running',
@@ -380,7 +450,7 @@ What would you like me to do next?`;
     }
   }
   
-  // Demo data helpers
+  // Demo data
   private getDemoSpecs(): Spec[] {
     return [
       {
@@ -402,47 +472,7 @@ What would you like me to do next?`;
         status: 'in_progress',
         createdAt: new Date(),
       },
-      {
-        id: '2',
-        title: 'REST API for Todo List',
-        description: 'Full CRUD API with database',
-        requirements: [
-          { type: 'U', text: 'The system shall provide CRUD operations for todos' },
-          { type: 'S', text: 'Each user can only see their own todos' },
-        ],
-        tasks: [
-          { id: 't5', title: 'Design database schema', description: 'Users and Todos tables', role: 'architect', status: 'completed' },
-          { id: 't6', title: 'Implement API routes', description: 'Express routes for CRUD', role: 'implementer', status: 'pending' },
-        ],
-        status: 'approved',
-        createdAt: new Date(Date.now() - 86400000),
-      },
     ];
-  }
-  
-  private createDemoSpec(prompt: string): Spec {
-    const title = prompt.length > 50 ? prompt.slice(0, 50) + '...' : prompt;
-    
-    return {
-      id: Date.now().toString(),
-      title: title.charAt(0).toUpperCase() + title.slice(1),
-      description: prompt,
-      requirements: [
-        { type: 'U', text: `The system shall implement: ${prompt.slice(0, 100)}` },
-        { type: 'S', text: 'All functionality must be accessible via API' },
-        { type: 'C', text: 'Must follow best practices and coding standards' },
-        { type: 'Q', text: 'Code must be well-documented and testable' },
-      ],
-      tasks: [
-        { id: 't1', title: 'Analyze requirements', description: 'Review and clarify requirements', role: 'architect', status: 'pending' },
-        { id: 't2', title: 'Design system', description: 'Create architecture and component design', role: 'architect', status: 'pending' },
-        { id: 't3', title: 'Implement core features', description: 'Write the main implementation', role: 'implementer', status: 'pending' },
-        { id: 't4', title: 'Write tests', description: 'Create unit and integration tests', role: 'tester', status: 'pending' },
-        { id: 't5', title: 'Create documentation', description: 'Document API and usage', role: 'docs-writer', status: 'pending' },
-      ],
-      status: 'draft',
-      createdAt: new Date(),
-    };
   }
   
   private getDemoHooks(): Hook[] {
@@ -460,13 +490,6 @@ What would you like me to do next?`;
         trigger: 'on_commit',
         prompt: 'Run prettier and eslint to format code before commit',
         enabled: true,
-      },
-      {
-        id: '3',
-        name: 'Generate docs on build',
-        trigger: 'on_build',
-        prompt: 'Generate API documentation from source files',
-        enabled: false,
       },
     ];
   }

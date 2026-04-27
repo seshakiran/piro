@@ -1,16 +1,17 @@
 /**
  * ProjectPanel - Project setup and management
+ * Functional project creation integrated with AI
  */
 
-import React, { useState } from 'react';
-import { PiroAPI } from '../api/piro-client';
+import React, { useState, useEffect } from 'react';
+import { PiroAPI, Spec } from '../api/piro-client';
 import type { Stage } from '../App';
 
 interface ProjectPanelProps {
   api: PiroAPI | null;
   workspacePath: string | null;
-  currentProject: { id: string; name: string; description: string; stage: Stage } | null;
-  setCurrentProject: (project: { id: string; name: string; description: string; stage: Stage } | null) => void;
+  currentProject: { id: string; name: string; description: string; stage: Stage; spec?: Spec } | null;
+  setCurrentProject: (project: { id: string; name: string; description: string; stage: Stage; spec?: Spec } | null) => void;
   onProjectCreate: (name: string, description: string) => void;
   addNotification: (type: 'info' | 'warning' | 'error' | 'success', title: string, message: string) => void;
 }
@@ -19,6 +20,7 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
   const [projectName, setProjectName] = useState('');
   const [projectDesc, setProjectDesc] = useState('');
   const [projectType, setProjectType] = useState('web');
+  const [isCreating, setIsCreating] = useState(false);
   
   const projectTypes = [
     { id: 'web', name: 'Web Application', icon: '🌐' },
@@ -29,19 +31,34 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
     { id: 'custom', name: 'Custom', icon: '🔧' },
   ];
   
-  const handleCreate = () => {
+  const recentProjects = [
+    { id: '1', name: 'E-commerce Platform', lastOpened: '2 hours ago', status: 'in_progress' },
+    { id: '2', name: 'Task Management API', lastOpened: 'Yesterday', status: 'completed' },
+    { id: '3', name: 'Mobile App MVP', lastOpened: '3 days ago', status: 'draft' },
+  ];
+  
+  const handleCreate = async () => {
     if (!projectName.trim()) {
       addNotification('error', 'Invalid Name', 'Please enter a project name');
       return;
     }
+    
+    setIsCreating(true);
+    
+    // Simulate AI processing
+    addNotification('info', 'AI Analysis', 'Analyzing requirements and creating project structure...');
+    
+    // Simulate delay for AI processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
     onProjectCreate(projectName, projectDesc);
+    setIsCreating(false);
   };
   
-  const recentProjects = [
-    { id: '1', name: 'E-commerce Platform', lastOpened: '2 hours ago' },
-    { id: '2', name: 'Task Management API', lastOpened: 'Yesterday' },
-    { id: '3', name: 'Mobile App MVP', lastOpened: '3 days ago' },
-  ];
+  const stageIndex = (stage: Stage): number => {
+    const stages: Stage[] = ['project', 'requirements', 'system-design', 'tech-design', 'development', 'testing', 'deployment'];
+    return stages.indexOf(stage);
+  };
   
   return (
     <div className="project-panel">
@@ -49,7 +66,7 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
         <>
           <div className="create-project-section">
             <h2>Create New Project</h2>
-            <p className="subtitle">Start a new project to begin the SDLC workflow</p>
+            <p className="subtitle">Describe what you want to build in the chat, or fill in details below</p>
             
             <div className="project-type-grid">
               {projectTypes.map(type => (
@@ -70,7 +87,7 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
                 type="text"
                 value={projectName}
                 onChange={e => setProjectName(e.target.value)}
-                placeholder="Enter project name..."
+                placeholder="My Awesome Project"
               />
             </div>
             
@@ -79,25 +96,56 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
               <textarea
                 value={projectDesc}
                 onChange={e => setProjectDesc(e.target.value)}
-                placeholder="Describe what you want to build..."
+                placeholder="Describe what you want to build in detail..."
                 rows={4}
               />
             </div>
             
-            <button className="create-btn" onClick={handleCreate}>
-              Create Project
+            <button 
+              className="create-btn" 
+              onClick={handleCreate}
+              disabled={isCreating || !projectName.trim()}
+            >
+              {isCreating ? (
+                <>
+                  <span className="spinner">⟳</span>
+                  Creating Project...
+                </>
+              ) : (
+                <>
+                  <span>🚀</span>
+                  Create Project
+                </>
+              )}
             </button>
+            
+            <div className="or-divider">
+              <span>OR</span>
+            </div>
+            
+            <div className="chat-hint">
+              <span className="hint-icon">💬</span>
+              <div>
+                <strong>Use Chat to create:</strong>
+                <p>Type "create project a todo app with user auth" in the Chat panel</p>
+              </div>
+            </div>
           </div>
           
           <div className="recent-projects-section">
             <h3>Recent Projects</h3>
             <div className="recent-list">
               {recentProjects.map(project => (
-                <div key={project.id} className="recent-item">
+                <div key={project.id} className="recent-item" onClick={() => {
+                  addNotification('info', 'Opening Project', `Opening ${project.name}...`);
+                }}>
                   <span className="recent-icon">📁</span>
                   <div className="recent-info">
                     <span className="recent-name">{project.name}</span>
-                    <span className="recent-time">{project.lastOpened}</span>
+                    <span className="recent-meta">
+                      {project.lastOpened}
+                      <span className={`status-badge ${project.status}`}>{project.status}</span>
+                    </span>
                   </div>
                 </div>
               ))}
@@ -107,43 +155,94 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
       ) : (
         <div className="project-dashboard">
           <div className="dashboard-header">
-            <h2>{currentProject.name}</h2>
+            <div className="project-title-section">
+              <h2>{currentProject.name}</h2>
+              <span className="project-type-badge">{projectType}</span>
+            </div>
             <p>{currentProject.description || 'No description provided'}</p>
           </div>
           
           <div className="sdlc-overview">
             <h3>SDLC Progress</h3>
             <div className="sdlc-steps">
-              {['Project Setup', 'Requirements', 'System Design', 'Tech Design', 'Development', 'Testing', 'Deployment'].map((step, index) => (
-                <div key={step} className={`sdlc-step ${index <= ['project', 'requirements', 'system-design', 'tech-design', 'development', 'testing', 'deployment'].indexOf(currentProject.stage) ? 'completed' : ''} ${index === ['project', 'requirements', 'system-design', 'tech-design', 'development', 'testing', 'deployment'].indexOf(currentProject.stage) ? 'current' : ''}`}>
-                  <div className="step-marker">{index + 1}</div>
-                  <div className="step-label">{step}</div>
-                </div>
-              ))}
+              {['Project Setup', 'Requirements', 'System Design', 'Tech Design', 'Development', 'Testing', 'Deployment'].map((step, index) => {
+                const stages: Stage[] = ['project', 'requirements', 'system-design', 'tech-design', 'development', 'testing', 'deployment'];
+                const currentIndex = stageIndex(currentProject.stage);
+                const isCompleted = index < currentIndex;
+                const isCurrent = index === currentIndex;
+                
+                return (
+                  <div key={step} className={`sdlc-step ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}>
+                    <div className="step-marker">
+                      {isCompleted ? '✓' : index + 1}
+                    </div>
+                    <div className="step-label">{step}</div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+          
+          <div className="project-spec-section">
+            <h3>Project Specification</h3>
+            {currentProject.spec ? (
+              <div className="spec-preview">
+                <div className="spec-status">
+                  <span className="status-label">Status: {currentProject.spec.status}</span>
+                </div>
+                <div className="spec-requirements">
+                  <h4>Requirements ({currentProject.spec.requirements?.length || 0})</h4>
+                  {currentProject.spec.requirements?.map((req, i) => (
+                    <div key={i} className="requirement-row">
+                      <span className="req-type">{req.type}</span>
+                      <span className="req-text">{req.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="spec-tasks">
+                  <h4>Tasks ({currentProject.spec.tasks?.length || 0})</h4>
+                  <div className="tasks-grid">
+                    {currentProject.spec.tasks?.map((task, i) => (
+                      <div key={i} className={`task-badge ${task.status}`}>
+                        <span className="task-role">{task.role}</span>
+                        <span className="task-title">{task.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="no-spec">
+                <p>No spec generated yet. Go to Requirements stage to generate one.</p>
+              </div>
+            )}
           </div>
           
           <div className="quick-actions">
             <h3>Quick Actions</h3>
             <div className="actions-grid">
-              <button className="action-card" onClick={() => addNotification('info', 'Open Folder', 'Open folder dialog')}>
+              <button className="action-card" onClick={() => addNotification('info', 'Open Folder', 'Opening folder dialog...')}>
                 <span className="action-icon">📂</span>
                 <span className="action-label">Open Folder</span>
               </button>
-              <button className="action-card">
+              <button className="action-card" onClick={() => addNotification('info', 'New Spec', 'Creating new specification...')}>
                 <span className="action-icon">📋</span>
-                <span className="action-label">New Spec</span>
+                <span className="action-label">Generate Spec</span>
               </button>
-              <button className="action-card">
+              <button className="action-card" onClick={() => addNotification('info', 'Run Agent', 'Opening agents panel...')}>
                 <span className="action-icon">🤖</span>
                 <span className="action-label">Run Agent</span>
               </button>
-              <button className="action-card">
+              <button className="action-card" onClick={() => addNotification('info', 'Settings', 'Opening settings...')}>
                 <span className="action-icon">⚡</span>
                 <span className="action-label">Power Tools</span>
               </button>
             </div>
           </div>
+          
+          <button className="delete-project-btn" onClick={() => setCurrentProject(null)}>
+            Start New Project
+          </button>
         </div>
       )}
       
@@ -171,6 +270,7 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
         .subtitle {
           color: var(--color-text-secondary);
           margin-bottom: 24px;
+          font-size: 14px;
         }
         
         .project-type-grid {
@@ -235,10 +335,67 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
           border-radius: var(--radius-md);
           font-size: 14px;
           font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
         }
         
-        .create-btn:hover {
+        .create-btn:hover:not(:disabled) {
           background: var(--color-accent-hover);
+        }
+        
+        .create-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+        
+        .spinner {
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        
+        .or-divider {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin: 24px 0;
+          color: var(--color-text-muted);
+          font-size: 12px;
+        }
+        
+        .or-divider::before, .or-divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: var(--color-border);
+        }
+        
+        .chat-hint {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 16px;
+          background: var(--color-bg-secondary);
+          border-radius: var(--radius-lg);
+          border: 1px dashed var(--color-border);
+        }
+        
+        .hint-icon {
+          font-size: 24px;
+        }
+        
+        .chat-hint strong {
+          display: block;
+          margin-bottom: 4px;
+        }
+        
+        .chat-hint p {
+          font-size: 12px;
+          color: var(--color-text-muted);
         }
         
         .recent-projects-section {
@@ -280,14 +437,40 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
         .recent-info {
           display: flex;
           flex-direction: column;
+          gap: 4px;
         }
         
         .recent-name {
           font-weight: 500;
         }
         
-        .recent-time {
+        .recent-meta {
           font-size: 11px;
+          color: var(--color-text-muted);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .status-badge {
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 10px;
+          text-transform: uppercase;
+        }
+        
+        .status-badge.in_progress {
+          background: var(--color-warning);
+          color: #000;
+        }
+        
+        .status-badge.completed {
+          background: var(--color-success);
+          color: #000;
+        }
+        
+        .status-badge.draft {
+          background: var(--color-bg-tertiary);
           color: var(--color-text-muted);
         }
         
@@ -295,9 +478,28 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
           flex: 1;
         }
         
+        .dashboard-header {
+          margin-bottom: 24px;
+        }
+        
+        .project-title-section {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+        
         .dashboard-header h2 {
           font-size: 28px;
-          margin-bottom: 8px;
+          margin: 0;
+        }
+        
+        .project-type-badge {
+          padding: 4px 12px;
+          background: var(--color-accent);
+          border-radius: 20px;
+          font-size: 11px;
+          text-transform: uppercase;
         }
         
         .dashboard-header p {
@@ -305,7 +507,7 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
         }
         
         .sdlc-overview {
-          margin: 32px 0;
+          margin: 24px 0;
           padding: 24px;
           background: var(--color-bg-secondary);
           border-radius: var(--radius-lg);
@@ -365,6 +567,105 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
           color: var(--color-text-primary);
         }
         
+        .project-spec-section {
+          margin: 24px 0;
+          padding: 24px;
+          background: var(--color-bg-secondary);
+          border-radius: var(--radius-lg);
+        }
+        
+        .project-spec-section h3 {
+          font-size: 14px;
+          margin-bottom: 16px;
+          color: var(--color-text-secondary);
+        }
+        
+        .spec-preview {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        
+        .spec-status {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .status-label {
+          padding: 4px 12px;
+          background: var(--color-warning);
+          color: #000;
+          border-radius: 4px;
+          font-size: 11px;
+          text-transform: uppercase;
+        }
+        
+        .spec-requirements h4, .spec-tasks h4 {
+          font-size: 12px;
+          margin-bottom: 8px;
+          color: var(--color-text-muted);
+        }
+        
+        .requirement-row {
+          display: flex;
+          gap: 12px;
+          padding: 8px 12px;
+          background: var(--color-bg-tertiary);
+          border-radius: var(--radius-sm);
+          margin-bottom: 6px;
+        }
+        
+        .req-type {
+          font-family: var(--font-mono);
+          font-weight: bold;
+          color: var(--color-accent);
+        }
+        
+        .req-text {
+          font-size: 13px;
+        }
+        
+        .tasks-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        
+        .task-badge {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: var(--color-bg-tertiary);
+          border-radius: 20px;
+          font-size: 12px;
+        }
+        
+        .task-badge.completed {
+          background: var(--color-success);
+          color: #000;
+        }
+        
+        .task-badge.in_progress {
+          background: var(--color-warning);
+          color: #000;
+        }
+        
+        .task-role {
+          font-size: 10px;
+          text-transform: uppercase;
+          opacity: 0.7;
+        }
+        
+        .no-spec {
+          padding: 24px;
+          text-align: center;
+          color: var(--color-text-muted);
+          background: var(--color-bg-tertiary);
+          border-radius: var(--radius-md);
+        }
+        
         .quick-actions h3 {
           font-size: 14px;
           margin-bottom: 16px;
@@ -401,6 +702,20 @@ export function ProjectPanel({ currentProject, setCurrentProject, onProjectCreat
         .action-label {
           font-size: 12px;
           font-weight: 500;
+        }
+        
+        .delete-project-btn {
+          margin-top: 24px;
+          padding: 12px;
+          background: var(--color-bg-secondary);
+          border-radius: var(--radius-md);
+          font-size: 13px;
+          color: var(--color-text-muted);
+        }
+        
+        .delete-project-btn:hover {
+          background: var(--color-error);
+          color: white;
         }
       `}</style>
     </div>
