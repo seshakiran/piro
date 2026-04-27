@@ -1,0 +1,124 @@
+{
+  "name": "piro-extension",
+  "version": "1.0.0",
+  "description": "Piro - Spec-driven AI coding agent for VS Code",
+  "publisher": "piro",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "piro",
+    "spec",
+    "kiro",
+    "claude",
+    "copilot"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:piro.specs",
+    "onCommand:piro.agents",
+    "onCommand:piro.hooks",
+    "onCommand:piro.deploy"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "piro.specs",
+        "title": "Piro: Spec Builder",
+        "category": "Piro"
+      },
+      {
+        "command": "piro.agents",
+        "title": "Piro: Agent Manager",
+        "category": "Piro"
+      },
+      {
+        "command": "piro.hooks",
+        "title": "Piro: Hooks Manager",
+        "category": "Piro"
+      },
+      {
+        "command": "piro.deploy",
+        "title": "Piro: Cloud Deploy",
+        "category": "Piro"
+      },
+      {
+        "command": "piro.generateSpec",
+        "title": "Piro: Generate Spec from Selection",
+        "category": "Piro"
+      },
+      {
+        "command": "piro.executeTask",
+        "title": "Piro: Execute Task",
+        "category": "Piro"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "piro",
+          "title": "Piro",
+          "icon": "resources/piro-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "piro": [
+        {
+          "id": "piro.specs",
+          "title": "Specs"
+        },
+        {
+          "id": "piro.agents",
+          "title": "Agents"
+        },
+        {
+          "id": "piro.hooks",
+          "title": "Hooks"
+        },
+        {
+          "id": "piro.deploy",
+          "title": "Deploy"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Piro",
+      "properties": {
+        "piro.coreUrl": {
+          "type": "string",
+          "default": "http://localhost:3847",
+          "description": "Piro Core server URL"
+        },
+        "piro.model": {
+          "type": "string",
+          "default": "MiniMax-M2.7",
+          "description": "Default model to use"
+        },
+        "piro.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to Piro Core on startup"
+        }
+      }
+    },
+    "statusBar": {
+      "items": [
+        {
+          "id": "piro-status",
+          "name": "Piro: $(robot)",
+          "command": "piro.status",
+          "alignment": "left"
+        }
+      ]
+    }
+  }
+}
