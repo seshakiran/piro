@@ -204,9 +204,8 @@ export function App() {
             </div>
           </div>
         );
-      case 'chat':
-        return <ChatPanel api={api} workspacePath={workspacePath} onCreateProject={createProject} onNavigate={(panel) => setActivePanel(panel as Panel)} />;
-      case 'subagents':
+    case 'chat': // Chat is in sidebar
+    case 'subagents':
         return <SubagentsPanel api={api} />;
       case 'settings':
         return <SettingsPanel api={api} />;
@@ -304,6 +303,16 @@ export function App() {
           {/* Panel content */}
           <div className="panel-content">
             {renderPanel()}
+          </div>
+          
+          {/* Chat Sidebar - Always visible (Copilot style) */}
+          <div className="chat-sidebar">
+            <ChatPanel 
+              api={api} 
+              workspacePath={workspacePath}
+              onCreateProject={createProject}
+              onNavigate={(panel) => setActivePanel(panel as Panel)}
+            />
           </div>
           
           {/* Terminal */}
@@ -526,6 +535,13 @@ export function App() {
           height: 250px;
           border-top: 1px solid var(--color-border);
           background: var(--color-bg-primary);
+        }
+        
+        .chat-sidebar {
+          width: 360px;
+          border-left: 1px solid var(--color-border);
+          display: flex;
+          flex-shrink: 0;
         }
         
         .explorer-panel {
