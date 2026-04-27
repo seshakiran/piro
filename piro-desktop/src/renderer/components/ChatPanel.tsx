@@ -1,5 +1,6 @@
 /**
- * ChatPanel - Main AI chat interface with @ mentions and commands
+ * ChatPanel - Natural conversational AI interface
+ * Like talking to an intelligent assistant, not a command line
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -19,15 +20,6 @@ interface ChatState {
   autopilot: boolean;
 }
 
-const agentMentions = [
-  { name: 'implementer', desc: 'Write code' },
-  { name: 'architect', desc: 'Design system' },
-  { name: 'tester', desc: 'Write tests' },
-  { name: 'docs-writer', desc: 'Write docs' },
-  { name: 'deployer', desc: 'Deploy' },
-  { name: 'reviewer', desc: 'Review code' },
-];
-
 export function ChatPanel({ api, workspacePath, onCreateProject, onNavigate }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [chatState, setChatState] = useState<ChatState>({
@@ -36,63 +28,35 @@ export function ChatPanel({ api, workspacePath, onCreateProject, onNavigate }: C
     spec: null,
     autopilot: false,
   });
-  const [showMentions, setShowMentions] = useState(false);
-  const [mentionFilter, setMentionFilter] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Welcome message
+  useEffect(() => {
+    if (chatState.messages.length === 0) {
+      setChatState(s => ({
+        ...s,
+        messages: [{
+          id: 'welcome',
+          role: 'assistant',
+          content: `👋 Hi! I'm your AI coding assistant.
+
+I can help you build anything - from a simple script to a full application. Just tell me what you want in natural language, and I'll guide you through the process.
+
+For example, you can say:
+• "I want to build a todo app with user login"
+• "Create a REST API for my startup"
+• "Add tests to our payment system"
+
+What would you like to build?`,
+          timestamp: new Date(),
+        }],
+      }));
+    }
+  }, []);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatState.messages]);
-  
-  // Handle @ mentions
-  useEffect(() => {
-    const lastAt = input.lastIndexOf('@');
-    if (lastAt !== -1) {
-      const afterAt = input.slice(lastAt + 1);
-      if (!afterAt.includes(' ') && afterAt.length < 20) {
-        setMentionFilter(afterAt.toLowerCase());
-        setShowMentions(true);
-      } else {
-        setShowMentions(false);
-      }
-    } else {
-      setShowMentions(false);
-    }
-  }, [input]);
-  
-  // Process special commands
-  const processCommand = (text: string): { command: string; args: string } | null => {
-    const lower = text.toLowerCase();
-    
-    if (lower.startsWith('create project ') || lower.startsWith('new project ')) {
-      return { command: 'create_project', args: text };
-    }
-    if (lower.startsWith('generate spec ') || lower.startsWith('create spec ') || lower.startsWith('new spec ')) {
-      return { command: 'generate_spec', args: text };
-    }
-    if (lower.startsWith('run tests') || lower.includes('run test')) {
-      return { command: 'run_tests', args: text };
-    }
-    if (lower.startsWith('commit ') || lower.includes('git commit')) {
-      return { command: 'git_commit', args: text };
-    }
-    if (lower.includes('deploy to ')) {
-      return { command: 'deploy', args: text };
-    }
-    if (lower.startsWith('run agent ') || lower.startsWith('@')) {
-      return { command: 'run_agent', args: text };
-    }
-    return null;
-  };
-  
-  const insertMention = (agent: string) => {
-    const lastAt = input.lastIndexOf('@');
-    const newInput = input.slice(0, lastAt) + `@${agent} `;
-    setInput(newInput);
-    setShowMentions(false);
-    inputRef.current?.focus();
-  };
   
   const sendMessage = async () => {
     if (!input.trim() || !api || chatState.loading) return;
@@ -110,77 +74,17 @@ export function ChatPanel({ api, workspacePath, onCreateProject, onNavigate }: C
       loading: true,
     }));
     
+    const userInput = input;
     setInput('');
     
-    // Check for commands
-    const command = processCommand(input);
-    let responseText = '';
-    
-    if (command) {
-      switch (command.command) {
-        case 'create_project':
-          responseText = `✅ Creating project from your prompt...\n\nI'll set up the project with:\n\n- Requirements gathering\n- System design\n- Technical design\n- Development workflow\n- Testing\n- Deployment\n\nNavigating to Requirements stage...`;
-          setTimeout(() => {
-            onCreateProject?.('New Project', command.args);
-            onNavigate?.('requirements');
-          }, 1500);
-          break;
-          
-        case 'generate_spec':
-          responseText = `📋 Generating spec from your prompt...\n\nI'll create:\n- EARS requirements\n- Task breakdown\n- Agent assignments\n\nNavigating to Spec view...`;
-          setTimeout(() => {
-            onNavigate?.('requirements');
-          }, 1500);
-          break;
-          
-        case 'run_tests':
-          responseText = `🧪 Running tests...\n\nExecuting test suite and checking coverage...`;
-          setTimeout(() => {
-            onNavigate?.('testing');
-          }, 1500);
-          break;
-          
-        case 'git_commit':
-          responseText = `🔀 Git commit: "${command.args}"\n\nI'll commit your changes with a descriptive message.`;
-          break;
-          
-        case 'deploy':
-          const provider = command.args.toLowerCase().includes('aws') ? 'AWS' :
-                          command.args.toLowerCase().includes('gcp') ? 'GCP' :
-                          command.args.toLowerCase().includes('azure') ? 'Azure' : 'cloud';
-          responseText = `🚀 Deploying to ${provider}...\n\nSetting up deployment to ${provider}...`;
-          setTimeout(() => {
-            onNavigate?.('deployment');
-          }, 1500);
-          break;
-          
-        case 'run_agent':
-          const agentType = command.args.toLowerCase().includes('@implementer') ? 'Implementer' :
-                            command.args.toLowerCase().includes('@architect') ? 'Architect' :
-                            command.args.toLowerCase().includes('@tester') ? 'Tester' :
-                            command.args.toLowerCase().includes('@docs') ? 'Docs Writer' :
-                            command.args.toLowerCase().includes('@deployer') ? 'Deployer' :
-                            command.args.toLowerCase().includes('@reviewer') ? 'Reviewer' : 'Agent';
-          responseText = `🤖 Spawning ${agentType} to execute your prompt...\n\nThe agent will work on:\n${command.args}\n\nNavigating to Agents panel...`;
-          setTimeout(() => {
-            onNavigate?.('subagents');
-          }, 1500);
-          break;
-          
-        default:
-          const response = await api.sendMessage(input);
-          responseText = response.message;
-      }
-    } else {
-      const response = await api.sendMessage(input);
-      responseText = response.message;
-    }
-    
     try {
+      // Process natural language - understand what user wants
+      const response = await processNaturalLanguage(userInput, api);
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: responseText,
+        content: response.message,
         timestamp: new Date(),
       };
       
@@ -188,85 +92,190 @@ export function ChatPanel({ api, workspacePath, onCreateProject, onNavigate }: C
         ...s,
         messages: [...s.messages, assistantMessage],
         loading: false,
+        spec: response.spec || s.spec,
       }));
     } catch (error) {
-      console.error('Failed to send message:', error);
-      setChatState(s => ({ ...s, loading: false }));
+      console.error('Chat error:', error);
+      setChatState(s => ({
+        ...s,
+        messages: [...s.messages, {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Let me try again!',
+          timestamp: new Date(),
+        }],
+        loading: false,
+      }));
     }
   };
   
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (showMentions) {
-      if (e.key === 'Escape') {
-        setShowMentions(false);
-      }
-      return;
+  // Natural language processing - understands intent
+  const processNaturalLanguage = async (text: string, api: PiroAPI): Promise<{ message: string; spec?: Spec }> => {
+    const lower = text.toLowerCase();
+    
+    // Project creation
+    if (lower.includes('build') || lower.includes('create') || lower.includes('make') || lower.includes('want to')) {
+      const projectName = extractProjectName(text);
+      
+      // Create project
+      onCreateProject?.(projectName, text);
+      
+      return {
+        message: `🎉 Great! I've created a new project called **"${projectName}"**.
+
+Now let's gather the requirements. What features should this ${projectName.toLowerCase()} have?
+
+For example:
+• Who are the users?
+• What should it do?
+• Any specific features or requirements?
+
+Or, if you want me to help define the requirements, just tell me more about what you're building!`,
+        spec: await api.generateSpec(text),
+      };
     }
     
+    // Requirements / features
+    if (lower.includes('feature') || lower.includes('requirement') || lower.includes('should') || lower.includes('need')) {
+      return {
+        message: `📝 Interesting! Let me help you define those requirements.
+
+I've noted:
+"${text.slice(0, 100)}..."
+
+Let's convert this into a proper specification using EARS notation. I'll ask you clarifying questions:
+
+1. **Scope** - What specifically should be included?
+2. **Constraints** - Any limitations or requirements?
+3. **Quality** - What performance, security, or other standards?
+
+Shall I generate a spec from this?`,
+        spec: await api.generateSpec(text),
+      };
+    }
+    
+    // Generate spec
+    if (lower.includes('generat') && (lower.includes('spec') || lower.includes('design'))) {
+      const spec = await api.generateSpec(text);
+      return {
+        message: `📋 I've generated a specification from your request!
+
+**Spec Details:**
+- ${spec.tasks?.length || 0} tasks identified
+- ${spec.requirements?.length || 0} requirements documented
+
+Want me to:
+- 📝 Show you the full spec?
+- ✅ Approve and move to System Design?
+- 💻 Start implementing?`,
+        spec,
+      };
+    }
+    
+    // Testing
+    if (lower.includes('test')) {
+      return {
+        message: `🧪 I can help with testing!
+
+For your project, I can:
+- Write unit tests
+- Generate test coverage reports
+- Run automated tests
+
+What would you like to test specifically?`,
+      };
+    }
+    
+    // Deploy
+    if (lower.includes('deploy') || lower.includes('launch') || lower.includes('host')) {
+      const provider = lower.includes('aws') ? 'AWS' : 
+                      lower.includes('gcp') || lower.includes('google') ? 'GCP' :
+                      lower.includes('azure') ? 'Azure' : 'cloud';
+      
+      return {
+        message: `🚀 I'd be happy to help deploy to ${provider}!
+
+To deploy, I need to know:
+- What's your deployment target (server, container, static site)?
+- Any specific configuration?
+
+Or I can set up deployment pipelines for you.`,
+      };
+    }
+    
+    // Help / questions
+    if (lower.includes('how') || lower.includes('what') || lower.includes('can you')) {
+      return {
+        message: `🤖 I'm here to help! Here's what I can do:
+
+**Building:**
+• "I want to build a [app description]" - Creates a new project
+• "Create a REST API for X" - Generates API specs
+
+**Working:**
+• "@implementer [task]" - Spawns a code-writing agent
+• "@tester [task]" - Creates tests
+• "@architect" - Designs your system
+
+**Running:**
+• "run tests" - Executes your test suite
+• "deploy to AWS" - Deploys to cloud
+
+What would you like to do?`,
+      };
+    }
+    
+    // Default - just chat naturally
+    const response = await api.sendMessage(text);
+    return { message: response.message };
+  };
+  
+  const extractProjectName = (text: string): string => {
+    // Extract project name from natural text
+    const afterBuild = text.replace(/(build|create|make|want to|i want to)/gi, '').trim();
+    const afterFor = afterBuild.split('for')[0].trim();
+    const name = afterFor.split(',')[0].trim();
+    
+    if (name.length > 3) {
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    return 'My Project';
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
   
-  const filteredMentions = agentMentions.filter(a => 
-    a.name.toLowerCase().includes(mentionFilter)
-  );
-  
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <h2>Chat</h2>
-        <div className="header-actions">
-          <button 
-            className={`autopilot-toggle ${chatState.autopilot ? 'active' : ''}`}
-            onClick={() => setChatState(s => ({ ...s, autopilot: !s.autopilot }))}
-          >
-            <span>⭐</span> Autopilot
-          </button>
-        </div>
+        <span className="chat-title">💬 Chat</span>
+        {chatState.autopilot && <span className="autopilot-badge">⭐ Autopilot</span>}
       </div>
       
       <div className="chat-messages">
-        {chatState.messages.length === 0 ? (
-          <div className="chat-welcome">
-            <div className="welcome-logo">P</div>
-            <h3>Welcome to Piro</h3>
-            <p>Start a conversation or describe what you want to build.</p>
-            <p className="hint">Try: "create project a todo app" or "@implementer write login"</p>
-            <div className="example-prompts">
-              <button onClick={() => setInput('create project a user authentication system')}>
-                create project user auth
-              </button>
-              <button onClick={() => setInput('@implementer create a REST API')}>
-                @implementer create REST API
-              </button>
-              <button onClick={() => setInput('deploy to AWS')}>
-                deploy to AWS
-              </button>
+        {chatState.messages.map(msg => (
+          <div key={msg.id} className={`message ${msg.role}`}>
+            <div className="message-avatar">
+              {msg.role === 'user' ? '👤' : '🤖'}
+            </div>
+            <div className="message-content">
+              <div className="message-text">{msg.content}</div>
+              <div className="message-time">
+                {new Date(msg.timestamp).toLocaleTimeString()}
+              </div>
             </div>
           </div>
-        ) : (
-          chatState.messages.map(msg => (
-            <div key={msg.id} className={`message message-${msg.role}`}>
-              <div className="message-avatar">
-                {msg.role === 'user' ? '👤' : '🤖'}
-              </div>
-              <div className="message-content">
-                <div className="message-text">{msg.content}</div>
-                <div className="message-time">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
+        ))}
         
         {chatState.loading && (
-          <div className="message message-assistant">
+          <div className="message assistant">
             <div className="message-avatar">🤖</div>
             <div className="message-content">
-              <div className="typing-indicator">
+              <div className="typing">
                 <span></span><span></span><span></span>
               </div>
             </div>
@@ -276,97 +285,177 @@ export function ChatPanel({ api, workspacePath, onCreateProject, onNavigate }: C
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="chat-input-area">
-        <div className="input-container">
-          <div className="input-wrapper">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message Piro... (commands: create project, generate spec, deploy to AWS, @agent)"
-              rows={3}
-            />
-            
-            {showMentions && (
-              <div className="mentions-dropdown">
-                <div className="mentions-header">Spawn Agent</div>
-                {filteredMentions.map(agent => (
-                  <div key={agent.name} className="mention-item" onClick={() => insertMention(agent.name)}>
-                    <span className="mention-name">@{agent.name}</span>
-                    <span className="mention-desc">{agent.desc}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div className="input-actions">
-            <button 
-              className="send-btn"
-              onClick={sendMessage}
-              disabled={chatState.loading || !input.trim()}
-            >
-              {chatState.loading ? '...' : 'Send'}
-            </button>
-          </div>
-        </div>
+      <div className="chat-input">
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Tell me what you want to build..."
+          rows={2}
+        />
+        <button onClick={sendMessage} disabled={chatState.loading || !input.trim()}>
+          {chatState.loading ? '...' : '➤'}
+        </button>
       </div>
       
       <style>{`
-        .chat-panel { display: flex; flex-direction: column; height: 100%; background: var(--color-bg-primary); }
+        .chat-panel {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          background: var(--color-bg-primary);
+        }
         
-        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-secondary); }
-        .chat-header h2 { font-size: 16px; font-weight: 600; }
+        .chat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--color-border);
+          background: var(--color-bg-secondary);
+        }
         
-        .autopilot-toggle { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-md); font-size: 12px; background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
-        .autopilot-toggle:hover { background: var(--color-bg-elevated); }
-        .autopilot-toggle.active { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; }
+        .chat-title {
+          font-weight: 600;
+          font-size: 14px;
+        }
         
-        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; }
+        .autopilot-badge {
+          font-size: 10px;
+          padding: 2px 8px;
+          background: linear-gradient(135deg, #ffd700, #ffaa00);
+          color: #000;
+          border-radius: 10px;
+        }
         
-        .chat-welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 40px; }
-        .welcome-logo { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--color-accent), var(--color-accent-secondary)); border-radius: var(--radius-xl); font-size: 32px; font-weight: bold; margin-bottom: 24px; }
-        .chat-welcome h3 { font-size: 24px; margin-bottom: 8px; }
-        .chat-welcome p { color: var(--color-text-secondary); margin-bottom: 16px; }
-        .hint { font-size: 12px; color: var(--color-text-muted); margin-bottom: 24px; }
+        .chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: 16px;
+        }
         
-        .example-prompts { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 400px; }
-        .example-prompts button { padding: 12px 16px; background: var(--color-bg-tertiary); border-radius: var(--radius-md); text-align: left; transition: background var(--transition-fast); }
-        .example-prompts button:hover { background: var(--color-bg-elevated); }
+        .message {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 16px;
+        }
         
-        .message { display: flex; gap: 12px; margin-bottom: 16px; }
-        .message-user { flex-direction: row-reverse; }
-        .message-avatar { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--color-bg-tertiary); border-radius: var(--radius-md); font-size: 16px; flex-shrink: 0; }
-        .message-content { max-width: 70%; background: var(--color-bg-secondary); border-radius: var(--radius-lg); padding: 12px 16px; }
-        .message-user .message-content { background: var(--color-accent); color: white; }
-        .message-text { white-space: pre-wrap; line-height: 1.6; }
-        .message-time { font-size: 10px; color: var(--color-text-muted); margin-top: 4px; }
-        .message-user .message-time { color: rgba(255, 255, 255, 0.6); }
+        .message.user {
+          flex-direction: row-reverse;
+        }
         
-        .typing-indicator { display: flex; gap: 4px; }
-        .typing-indicator span { width: 8px; height: 8px; background: var(--color-text-muted); border-radius: 50%; animation: typing 1.4s infinite; }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+        .message-avatar {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--color-bg-secondary);
+          border-radius: 50%;
+          font-size: 14px;
+          flex-shrink: 0;
+        }
         
-        .chat-input-area { padding: 16px; border-top: 1px solid var(--color-border); background: var(--color-bg-secondary); }
-        .input-container { display: flex; gap: 8px; background: var(--color-bg-tertiary); border-radius: var(--radius-lg); padding: 8px; }
-        .input-wrapper { flex: 1; position: relative; }
-        .input-wrapper textarea { width: 100%; background: transparent; border: none; resize: none; min-height: 60px; padding: 8px; }
-        .input-wrapper textarea:focus { outline: none; }
+        .message.assistant .message-avatar {
+          background: var(--color-accent);
+        }
         
-        .mentions-dropdown { position: absolute; bottom: 100%; left: 0; right: 0; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 8px; box-shadow: var(--shadow-lg); }
-        .mentions-header { padding: 8px 12px; font-size: 11px; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
-        .mention-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; }
-        .mention-item:hover { background: var(--color-bg-tertiary); }
-        .mention-name { font-weight: 600; color: var(--color-accent); }
-        .mention-desc { font-size: 12px; color: var(--color-text-muted); }
+        .message-content {
+          max-width: 85%;
+          background: var(--color-bg-secondary);
+          border-radius: 16px;
+          padding: 12px 16px;
+        }
         
-        .input-actions { display: flex; align-items: flex-end; }
-        .send-btn { padding: 8px 16px; background: var(--color-accent); color: white; border-radius: var(--radius-md); font-weight: 500; }
-        .send-btn:hover:not(:disabled) { background: var(--color-accent-hover); }
-        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .message.user .message-content {
+          background: var(--color-accent);
+          color: white;
+        }
+        
+        .message-text {
+          white-space: pre-wrap;
+          line-height: 1.5;
+          font-size: 14px;
+        }
+        
+        .message-time {
+          font-size: 10px;
+          color: var(--color-text-muted);
+          margin-top: 4px;
+        }
+        
+        .message.user .message-time {
+          color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .typing {
+          display: flex;
+          gap: 4px;
+          padding: 8px 0;
+        }
+        
+        .typing span {
+          width: 8px;
+          height: 8px;
+          background: var(--color-text-muted);
+          border-radius: 50%;
+          animation: typing 1s infinite;
+        }
+        
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-6px); }
+        }
+        
+        .chat-input {
+          display: flex;
+          gap: 8px;
+          padding: 12px;
+          border-top: 1px solid var(--color-border);
+          background: var(--color-bg-secondary);
+        }
+        
+        .chat-input textarea {
+          flex: 1;
+          resize: none;
+          border: none;
+          background: transparent;
+          color: var(--color-text-primary);
+          font-size: 14px;
+          padding: 8px;
+        }
+        
+        .chat-input textarea:focus {
+          outline: none;
+        }
+        
+        .chat-input textarea::placeholder {
+          color: var(--color-text-muted);
+        }
+        
+        .chat-input button {
+          width: 40px;
+          height: 40px;
+          background: var(--color-accent);
+          border: none;
+          border-radius: 50%;
+          color: white;
+          font-size: 18px;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        
+        .chat-input button:hover {
+          background: var(--color-accent-hover);
+        }
+        
+        .chat-input button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
       `}</style>
     </div>
   );
